@@ -1,0 +1,10 @@
+{
+"protocol":"JDBC",
+"data":{
+"DBType" = "MYSQL",
+"sqlUsername"="username",
+"sqlPassword"="password",
+"sqlStatement"="SELECT * FROM pet"
+
+	}
+}
