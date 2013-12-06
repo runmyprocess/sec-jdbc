@@ -54,7 +54,6 @@ You can now run the Adapter by executing the generated jar in the chosen path :
 If everything is configured correctly and the sec-Manager is running you can now Post the manager to retreve information from the database.
 The POST body should look something like this :
     
-	:::JSONRMP
 	{
 	"protocol":"DBAgent",
 	"data":{
@@ -69,7 +68,6 @@ The POST body should look something like this :
 Note that the DBType should coincide with the type in the configuration file. This value **IS** case sensitive.
 The expected return is a JSON object that should look like this :
 
-	:::JSONRMP
 	{
 	"SECStatus":200,
 	"DBData":{
