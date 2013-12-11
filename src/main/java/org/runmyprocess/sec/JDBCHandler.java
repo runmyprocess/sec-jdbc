@@ -32,7 +32,7 @@ import java.util.logging.Level;
  */
 public class JDBCHandler {
     /**
-     * reads the configuration files and calls the run method of the generic handler
+     * reads the configuration files and calls the run method of the generic handlerconfig
      * @param args
      * @throws IOException
      */
