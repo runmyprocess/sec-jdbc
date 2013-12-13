@@ -29,25 +29,6 @@
 
     </dependencies>
 
-    <repositories>
-        <repository>
-            <id>json-mvn-repo</id>
-            <url>https://raw.github.com/runmyprocess/json/mvn-repo/</url>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>always</updatePolicy>
-            </snapshots>
-        </repository>
-        <repository>
-            <id>sec-sdk-mvn-repo</id>
-            <url>https://raw.github.com/runmyprocess/sec-sdk/mvn-repo/</url>
-            <snapshots>
-                <enabled>true</enabled>
-                <updatePolicy>always</updatePolicy>
-            </snapshots>
-        </repository>
-    </repositories>
-
     <build>
         <plugins>
             <plugin>
