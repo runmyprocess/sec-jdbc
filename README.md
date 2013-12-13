@@ -5,7 +5,7 @@ The "JDBC Adapter" allows you to access data stored in your databases from the [
 
 
 ##Install and Configure the Adapter
-1. Make sure you have [Java](http://www.oracle.com/technetwork/java/index.html) and [Maven](http://maven.apache.org/) installed on your machine.
+1. Make sure you have [Java](http://www.oracle.com/technetwork/java/index.html) and [Maven](http://maven.apache.org/) installed on your machine. You must also have the RMP's [JSON](https://github.com/runmyprocess/json/) and the [sec-sdk](https://github.com/runmyprocess/sec-sdk) libraries installed on your local mvn repo.
 2. Download the jdbc project and  run mvn clean install on the project's folder.
 
 Run mvn clean install :
