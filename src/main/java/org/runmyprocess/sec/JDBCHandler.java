@@ -1,8 +1,5 @@
 package org.runmyprocess.sec;
 
-import org.runmyprocess.sec.Config;
-import org.runmyprocess.sec.GenericHandler;
-import org.runmyprocess.sec.SECErrorManager;
 
 import java.io.File;
 import java.io.IOException;
@@ -38,15 +35,16 @@ public class JDBCHandler {
      */
     public static void main(String [] args)throws IOException {
 
+        // Logging instance
+        final  SECLogManager LOG = new SECLogManager(JDBC.class.getName());
         try{
             GenericHandler genericHandler = new GenericHandler();//Creates a new instance of generic handler
-            System.out.println( "Searching for config file..." );
-             Config conf = new Config("configFiles"+File.separator+"handler.config",true);//sets the congif info
-            System.out.println( "Handler config file found for manager ping port " + conf.getProperty("managerPort"));
+            LOG.log( "Starting JDBC Adapter...",Level.INFO);
+            Config conf = new Config("configFiles"+File.separator+"handler.config",true);//sets the congif info
             genericHandler.run( conf);//Runs the handler
+            LOG.log( "JDBC Adapter Started",Level.INFO);
         }catch( Exception e ){
-            SECErrorManager errorManager = new SECErrorManager();//creates a new instance of the SDK error manager
-            errorManager.logError(e.getMessage(), Level.SEVERE);//logs the error
+            LOG.log(e.getLocalizedMessage(),e, Level.SEVERE);//logs the error
             e.printStackTrace();//prints the error stack trace
         }
     }

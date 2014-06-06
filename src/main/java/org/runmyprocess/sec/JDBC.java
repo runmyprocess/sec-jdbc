@@ -1,6 +1,8 @@
 package org.runmyprocess.sec;
 
 import java.io.File;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.sql.Connection;
@@ -16,12 +18,9 @@ import java.util.Properties;
 import java.util.logging.Level;
 
 
-import org.runmyprocess.sec.Config;
-import org.runmyprocess.sec.ProtocolInterface;
-import org.runmyprocess.sec.Response;
-import org.runmyprocess.sec.SECErrorManager;
 import org.runmyprocess.json.JSONArray;
 import org.runmyprocess.json.JSONObject;
+
 
 /**
  *
@@ -47,6 +46,9 @@ import org.runmyprocess.json.JSONObject;
  */
 public class JDBC implements ProtocolInterface {
 
+    // Logging instance
+
+    private static final  SECLogManager LOG = new SECLogManager(JDBC.class.getName());
 
     private Response response = new Response();
 
@@ -56,15 +58,17 @@ public class JDBC implements ProtocolInterface {
     }
 
     /**
-     *
-     * @param error error message
+     * Generates the error that will be sent back
+     * @param e error
      * @return jsonObject error
      */
-    private JSONObject DBAgentError(String error){
+    private JSONObject DBAgentError(Exception e){
 
         response.setStatus(400);//sets the return status to internal server error
         JSONObject errorObject = new JSONObject();
-        errorObject.put("error", error.toString());
+        errorObject.put("error", e.toString());
+        System.out.println(e.toString());
+        response.setData(errorObject);
         return errorObject;
     }
 
@@ -116,7 +120,6 @@ public class JDBC implements ProtocolInterface {
     private Connection getConnection(String userName, String password, String sqlSource, String sqlDriver,
                                      String driverPath) throws Exception {
 
-        System.out.println("Connecting to "+sqlSource);
         Connection conn = null;
         Properties connectionProps = new Properties();
         connectionProps.put("user", userName);
@@ -128,8 +131,6 @@ public class JDBC implements ProtocolInterface {
         Driver driver = (Driver)Class.forName(sqlDriver, true, ucl).newInstance();
         DriverManager.registerDriver(new DriverShim(driver));
         conn = DriverManager.getConnection(sqlSource, userName, password);
-
-        System.out.println("Connected to database");
         return conn;
     }
 
@@ -140,29 +141,36 @@ public class JDBC implements ProtocolInterface {
      * @return  a jsonObject with the result of the call
      * @throws SQLException
      */
-    private static JSONObject ExecuteStatement(Connection con, String sqlStatement)throws SQLException {
+    private static JSONObject ExecuteStatement(Connection con, String sqlStatement)throws Exception {
 
     // Get a statement from the connection
     Statement stmt = con.createStatement() ;
     JSONObject retObj = new JSONObject();
     // Execute the SQL
-    if( stmt.execute(sqlStatement) == false )
-    {
-        // Get the update count
-        String rep = "Query OK, "+ stmt.getUpdateCount() + " rows affected" ;
-        retObj.put("Message",rep);
-        System.out.println(rep) ;
-    }
-    else
-    {
-        // Get the result set and the metadata
-        ResultSet         rs = stmt.getResultSet() ;
-        retObj = resultSet2JSONObject(rs);
+    try{
+        LOG.log("Executing query ...", Level.INFO);
+        if( stmt.execute(sqlStatement) == false )
+        {
+            // Get the update count
+            String rep = "Query OK, "+ stmt.getUpdateCount() + " rows affected" ;
+            retObj.put("Message",rep);
+            LOG.log(rep, Level.INFO);
+        }
+        else
+        {
+            // Get the result set and the metadata
+            ResultSet rs = stmt.getResultSet() ;
+            retObj = resultSet2JSONObject(rs);
+            LOG.log("Query result: " + retObj.getString("result"), Level.INFO);
 
+        }
+    } catch (Exception e){
+        LOG.log("Query execution failed", Level.INFO);
+        throw new Exception(e);
+    }   finally {
+        stmt.close() ;
+        con.close() ;
     }
-    stmt.close() ;
-    con.close() ;
-
     return retObj;
 
     }
@@ -193,12 +201,8 @@ public class JDBC implements ProtocolInterface {
      */
     @Override
     public void accept(JSONObject jsonObject,String configPath) {
-
-        try {
-            System.out.println ("Searching for config file...");
+        try{
             Config conf = new Config("configFiles"+File.separator+ "JDBC.config",true);//sets the config info
-            System.out.println( "Config file found  ");
-
             JSONObject prop = JSONObject.fromString(conf.getProperty(jsonObject.getString("DBType")));
 
             JSONObject DBData = Execute(prop.getString("sqlDriverPath"),prop.getString("sqlDriver"),
@@ -211,10 +215,8 @@ public class JDBC implements ProtocolInterface {
             response.setData(resp);
 
         } catch (Exception e) {
-            response.setData(this.DBAgentError(e.getMessage()));
-            SECErrorManager errorManager = new SECErrorManager();
-            errorManager.logError(e.getMessage(), Level.SEVERE);
-            e.printStackTrace();
+            DBAgentError(e);
+            //LOG.log(e.getLocalizedMessage(), e, Level.SEVERE);
         }
     }
 
