@@ -1,8 +1,6 @@
 package org.runmyprocess.sec;
 
 import java.io.File;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.sql.Connection;
@@ -12,15 +10,14 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-
+import java.util.Base64;
 import java.util.Properties;
-
 import java.util.logging.Level;
-
-
 import org.runmyprocess.json.JSONArray;
 import org.runmyprocess.json.JSONObject;
 
+
+import static javax.xml.bind.DatatypeConverter.parseBase64Binary;
 
 /**
  *
@@ -46,10 +43,7 @@ import org.runmyprocess.json.JSONObject;
  */
 public class JDBC implements ProtocolInterface {
 
-    // Logging instance
-
-    private static final  SECLogManager LOG = new SECLogManager(JDBC.class.getName());
-
+    final SECLogManager LOG = new SECLogManager(JDBC.class.getName());
     private Response response = new Response();
 
 
@@ -58,17 +52,15 @@ public class JDBC implements ProtocolInterface {
     }
 
     /**
-     * Generates the error that will be sent back
-     * @param e error
+     *
+     * @param error error message
      * @return jsonObject error
      */
-    private JSONObject DBAgentError(Exception e){
-
+    private JSONObject DBAgentError(String error){
+        LOG.log(error, Level.SEVERE);
         response.setStatus(400);//sets the return status to internal server error
         JSONObject errorObject = new JSONObject();
-        errorObject.put("error", e.toString());
-        System.out.println(e.toString());
-        response.setData(errorObject);
+        errorObject.put("error", error);
         return errorObject;
     }
 
@@ -120,6 +112,7 @@ public class JDBC implements ProtocolInterface {
     private Connection getConnection(String userName, String password, String sqlSource, String sqlDriver,
                                      String driverPath) throws Exception {
 
+        LOG.log("Connecting to "+sqlSource,Level.INFO);
         Connection conn = null;
         Properties connectionProps = new Properties();
         connectionProps.put("user", userName);
@@ -131,6 +124,8 @@ public class JDBC implements ProtocolInterface {
         Driver driver = (Driver)Class.forName(sqlDriver, true, ucl).newInstance();
         DriverManager.registerDriver(new DriverShim(driver));
         conn = DriverManager.getConnection(sqlSource, userName, password);
+
+        LOG.log("Connected to database", Level.INFO);
         return conn;
     }
 
@@ -141,36 +136,28 @@ public class JDBC implements ProtocolInterface {
      * @return  a jsonObject with the result of the call
      * @throws SQLException
      */
-    private static JSONObject ExecuteStatement(Connection con, String sqlStatement)throws Exception {
+    private static JSONObject ExecuteStatement(Connection con, String sqlStatement)throws SQLException {
 
     // Get a statement from the connection
     Statement stmt = con.createStatement() ;
     JSONObject retObj = new JSONObject();
     // Execute the SQL
-    try{
-        LOG.log("Executing query ...", Level.INFO);
-        if( stmt.execute(sqlStatement) == false )
-        {
-            // Get the update count
-            String rep = "Query OK, "+ stmt.getUpdateCount() + " rows affected" ;
-            retObj.put("Message",rep);
-            LOG.log(rep, Level.INFO);
-        }
-        else
-        {
-            // Get the result set and the metadata
-            ResultSet rs = stmt.getResultSet() ;
-            retObj = resultSet2JSONObject(rs);
-            LOG.log("Query result: " + retObj.getString("result"), Level.INFO);
-
-        }
-    } catch (Exception e){
-        LOG.log("Query execution failed", Level.INFO);
-        throw new Exception(e);
-    }   finally {
-        stmt.close() ;
-        con.close() ;
+    if( stmt.execute(sqlStatement) == false )
+    {
+        // Get the update count
+        String rep = "Query OK, "+ stmt.getUpdateCount() + " rows affected" ;
+        retObj.put("Message",rep);
     }
+    else
+    {
+        // Get the result set and the metadata
+        ResultSet         rs = stmt.getResultSet() ;
+        retObj = resultSet2JSONObject(rs);
+
+    }
+    stmt.close() ;
+    con.close() ;
+
     return retObj;
 
     }
@@ -201,22 +188,47 @@ public class JDBC implements ProtocolInterface {
      */
     @Override
     public void accept(JSONObject jsonObject,String configPath) {
-        try{
-            Config conf = new Config("configFiles"+File.separator+ "JDBC.config",true);//sets the config info
-            JSONObject prop = JSONObject.fromString(conf.getProperty(jsonObject.getString("DBType")));
 
-            JSONObject DBData = Execute(prop.getString("sqlDriverPath"),prop.getString("sqlDriver"),
-                    prop.getString("sqlSource"),jsonObject.getString("sqlUsername"),jsonObject.getString("sqlPassword"),
-                    jsonObject.getString("sqlStatement")) ;
+        try {
+
+            LOG.log("Searching for config file...", Level.INFO);
+            Config conf = new Config("configFiles"+File.separator+ "JDBC.config",true);//sets the config info
+            LOG.log( "Config file found  ", Level.INFO);
+
+            String sqlUsername = jsonObject.getString("sqlUsername");
+            String sqlPassword = jsonObject.getString("sqlPassword");
+            String sqlStatement = jsonObject.getString("sqlStatement");
+            String DBType = jsonObject.getString("DBType");
+            //decode base 64 if necesary
+            if (jsonObject.containsKey("base64Input") && jsonObject.getString("base64Input").equals("true")){
+                sqlUsername = new String(Base64.getDecoder().decode(sqlUsername));
+                sqlPassword = new String(Base64.getDecoder().decode(sqlPassword));
+                sqlStatement = new String(Base64.getDecoder().decode(sqlStatement));
+                DBType = new String(Base64.getDecoder().decode(DBType));
+            }
+
+            JSONObject prop = JSONObject.fromString(conf.getProperty(DBType));
+
+            JSONObject DBData = Execute(prop.getString("sqlDriverPath"), prop.getString("sqlDriver"),
+                    prop.getString("sqlSource"), sqlUsername, sqlPassword,
+                    sqlStatement) ;
 
             response.setStatus(200);//sets the return status to 200
             JSONObject resp = new JSONObject();
-            resp.put("DBData", DBData);//sends the info inside an object
+            if (jsonObject.containsKey("base64Output") && jsonObject.getString("base64Output").equals("true")){
+
+                resp.put("DBData", new String (Base64.getEncoder().encode(DBData.toString().getBytes())));//sends the info inside an object
+            }else{
+                resp.put("DBData", DBData);//sends the info inside an object
+            }
             response.setData(resp);
 
         } catch (Exception e) {
-            DBAgentError(e);
-            //LOG.log(e.getLocalizedMessage(), e, Level.SEVERE);
+            e.printStackTrace();
+            response.setData(this.DBAgentError(e.getMessage()));
+            SECErrorManager errorManager = new SECErrorManager();
+            errorManager.logError(e.getMessage(), Level.SEVERE);
+
         }
     }
 

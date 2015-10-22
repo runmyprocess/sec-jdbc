@@ -1,5 +1,8 @@
 package org.runmyprocess.sec;
 
+import org.runmyprocess.sec.Config;
+import org.runmyprocess.sec.GenericHandler;
+import org.runmyprocess.sec.SECErrorManager;
 
 import java.io.File;
 import java.io.IOException;
@@ -29,22 +32,23 @@ import java.util.logging.Level;
  */
 public class JDBCHandler {
     /**
-     * reads the configuration files and calls the run method of the generic handlerconfig
+     * reads the configuration files and calls the run method of the generic handler
      * @param args
      * @throws IOException
      */
     public static void main(String [] args)throws IOException {
-
         // Logging instance
-        final  SECLogManager LOG = new SECLogManager(JDBC.class.getName());
+        final SECLogManager LOG = new SECLogManager(JDBCHandler.class.getName());
         try{
             GenericHandler genericHandler = new GenericHandler();//Creates a new instance of generic handler
-            LOG.log( "Starting JDBC Adapter...",Level.INFO);
-            Config conf = new Config("configFiles"+File.separator+"handler.config",true);//sets the congif info
+
+            LOG.log("Searching for config file...", Level.INFO);
+             Config conf = new Config("configFiles"+File.separator+"handler.config",true);//sets the congif info
+            LOG.log("Handler config file found for manager ping port " + conf.getProperty("managerPort"), Level.INFO);
             genericHandler.run( conf);//Runs the handler
-            LOG.log( "JDBC Adapter Started",Level.INFO);
         }catch( Exception e ){
-            LOG.log(e.getLocalizedMessage(),e, Level.SEVERE);//logs the error
+            SECErrorManager errorManager = new SECErrorManager();//creates a new instance of the SDK error manager
+            errorManager.logError(e.getMessage(), Level.SEVERE);//logs the error
             e.printStackTrace();//prints the error stack trace
         }
     }
